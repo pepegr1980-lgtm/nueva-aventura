@@ -69,6 +69,64 @@ input,select{width:100%;padding:12px;margin:8px 0;border-radius:5px;border:1px s
 const firebaseConfig={apiKey:"AIzaSyC4FVokHFRbbTc4rBifNyt5bvOX2CuzkWw",authDomain:"calificaciones-9f753.firebaseapp.com",projectId:"calificaciones-9f753"};
 firebase.initializeApp(firebaseConfig);
 const db=firebase.firestore();
+
+/* =========================
+   🔥 AQUI PEGAS EL CODIGO #2
+========================= */
+
+const listaDestinos = document.getElementById("listaDestinos");
+
+function guardarDestino(){
+  const nombre = document.getElementById("destinoNombre").value;
+  const precio = parseInt(document.getElementById("destinoPrecio").value);
+  const imagen = document.getElementById("destinoImagen").value;
+
+  if(!nombre || !precio || !imagen){
+    alert("Completa todos los campos");
+    return;
+  }
+
+  db.collection("destinos").doc(nombre).set({
+    nombre,
+    precio,
+    imagen
+  });
+
+  alert("✅ Destino guardado");
+}
+
+db.collection("destinos").onSnapshot(snapshot=>{
+  listaDestinos.innerHTML="";
+  snapshot.forEach(doc=>{
+    const d = doc.data();
+
+    const div = document.createElement("div");
+    div.classList.add("reserva");
+
+    div.innerHTML = `
+      <strong>${d.nombre}</strong><br>
+      💰 $${d.precio}<br>
+      <img src="${d.imagen}" width="100"><br>
+      <button class="btn" onclick="editarDestino('${d.nombre}','${d.precio}','${d.imagen}')">Editar</button>
+      <button class="btn" onclick="eliminarDestino('${d.nombre}')">Eliminar</button>
+    `;
+
+    listaDestinos.appendChild(div);
+  });
+});
+
+function editarDestino(nombre, precio, imagen){
+  document.getElementById("destinoNombre").value = nombre;
+  document.getElementById("destinoPrecio").value = precio;
+  document.getElementById("destinoImagen").value = imagen;
+}
+
+function eliminarDestino(nombre){
+  if(confirm("¿Eliminar destino?")){
+    db.collection("destinos").doc(nombre).delete();
+  }
+}
+
 const form=document.getElementById('reservaForm');
 const lista=document.getElementById('listaReservas');
 const status=document.getElementById('status');
