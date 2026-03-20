@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nueva Aventura Monterrey</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+        }
+
+        header {
+            background: #0a3d62;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+
+        nav {
+            background: #1e3799;
+            padding: 10px;
+            text-align: center;
+        }
+
+        nav a {
+            color: white;
+            margin: 10px;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .hero {
+            background: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e') center/cover;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 30px;
+            text-shadow: 2px 2px 5px black;
+        }
+
+        .contenedor {
+            padding: 20px;
+        }
+
+        .destinos {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .card img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+        }
+
+        .card h3 {
+            margin: 10px;
+        }
+
+        .card p {
+            margin: 10px;
+        }
+
+        .btn {
+            display: block;
+            margin: 10px;
+            padding: 10px;
+            background: #e58e26;
+            color: white;
+            text-align: center;
+            text-decoration: none;
+            border-radius: 5px;
+        }
+
+        footer {
+            background: #0a3d62;
+            color: white;
+            text-align: center;
+            padding: 15px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>Nueva Aventura Monterrey</h1>
+    <p>¡Viaja, disfruta y vive nuevas experiencias!</p>
+</header>
+
+<nav>
+    <a href="#">Inicio</a>
+    <a href="#">Destinos</a>
+    <a href="#">Reservas</a>
+    <a href="#">Contacto</a>
+</nav>
+
+<div class="hero">
+    Descubre tu próxima aventura
+</div>
+
+<div class="contenedor">
+    <h2>Destinos Destacados</h2>
+
+    <div class="destinos">
+
+        <!-- MIRAMAR -->
+        <div class="card">
+            <img src="https://images.unsplash.com/photo-1500375592092-40eb2168fd21" alt="Miramar">
+            <h3>Playa Miramar</h3>
+            <p>Disfruta de arena, sol y mar en uno de los destinos más relajantes.</p>
+            <a href="https://pepegr1980-lgtm.github.io/app-viajes/" class="btn">Reservar</a>
+        </div>
+
+        <!-- MAZATLÁN -->
+        <div class="card">
+            <img src="https://images.unsplash.com/photo-1583417319070-4a69db38a482" alt="Mazatlán">
+            <h3>Mazatlán - Semana de la Troca</h3>
+            <p>Vive el ambiente único, música, fiesta y exhibición de trocas.</p>
+            <a href="#" class="btn">Reservar</a>
+        </div>
+
+        <!-- CDMX -->
+        <div class="card">
+            <img src="https://images.unsplash.com/photo-1585464231875-d9ef1f5ad396" alt="CDMX">
+            <h3>Viaje de Compras CDMX</h3>
+            <p>Explora mercados, plazas y consigue las mejores ofertas en la ciudad.</p>
+            <a href="#" class="btn">Reservar</a>
+        </div>
+
+    </div>
+</div>
+
+<footer>
+    <p>© 2026 Nueva Aventura Monterrey | Todos los derechos reservados</p>
+</footer>
+
+</body>
+</html>
