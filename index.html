@@ -1,29 +1,149 @@
 <!DOCTYPE html>
-<html>
+<html lang="es">
 <head>
+<meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Reservas</title>
+<title>Nueva Aventura - Chatbot</title>
+<style>
+body {font-family: Arial; background:#eef2f7; margin:0}
+.container {max-width:420px;margin:40px auto;background:white;border-radius:12px;box-shadow:0 0 15px rgba(0,0,0,0.2);overflow:hidden}
+.header {background:#0a74da;color:white;padding:15px;text-align:center;font-size:18px}
+#chat {height:420px;overflow-y:auto;padding:10px}
+.msg {margin:10px 0;padding:8px;border-radius:8px}
+.bot {background:#e3f2fd}
+.user {background:#c8e6c9;text-align:right}
+#inputArea {display:flex;border-top:1px solid #ccc}
+#input {flex:1;padding:10px;border:none}
+button {background:#0a74da;color:white;border:none;padding:10px;cursor:pointer}
+.options button {margin:5px;padding:8px;background:#1976d2}
+</style>
 </head>
-
 <body>
 
-<h2>Reserva tu viaje</h2>
+<div class="container">
+  <div class="header">✈️ Nueva Aventura</div>
+  <div id="chat"></div>
+  <div id="inputArea">
+    <input id="input" placeholder="Escribe...">
+    <button onclick="send()">Enviar</button>
+  </div>
+</div>
 
-<form action="https://script.google.com/macros/s/AKfycbx86F_TS1CkvOE804td5DcLSYTmZeat8bZhs3rSZsTJ2HB_rV6gUMNARHnob7HNlHGO/exec" method="GET">
-<input name="nombre" placeholder="Nombre" required>
-<input name="telefono" placeholder="Teléfono" required>
+<script>
+let step = 0;
+let data = {};
 
-<select name="destino">
-<option value="Cancun">Cancún</option>
-<option value="Mazatlan">Mazatlán</option>
-<option value="Monterrey">Monterrey</option>
-</select>
+// ⚠️ PEGA AQUÍ TU URL CORRECTA DE APPS SCRIPT (termina en /exec)
+const API_URL = "https://script.google.com/macros/s/AKfycbyntRT7Ft7OfNI873wPfgla1I5NFjgeoiZR4XrCtuhh-zeFAFMqOlcWqnWq9ywR9HCG/exec";
 
-<input type="date" name="fecha" required>
-<input name="personas" placeholder="Personas" required>
+function addMsg(text, cls) {
+  document.getElementById('chat').innerHTML += `<div class='msg ${cls}'>${text}</div>`;
+  scroll();
+}
 
-<button type="submit">Reservar</button>
-</form>
+function scroll() {
+  let c = document.getElementById('chat');
+  c.scrollTop = c.scrollHeight;
+}
+
+function send() {
+  let input = document.getElementById('input');
+  let val = input.value.trim();
+  if (!val) return;
+  addMsg(val, 'user');
+  input.value = '';
+  process(val);
+}
+
+function buttons(options) {
+  let html = '<div class="options">';
+  options.forEach(o => {
+    html += `<button onclick="selectOption('${o}')">${o}</button>`;
+  });
+  html += '</div>';
+  addMsg(html, 'bot');
+}
+
+function selectOption(val) {
+  addMsg(val, 'user');
+  process(val);
+}
+
+function process(val) {
+  switch (step) {
+    case 0:
+      addMsg('👋 Bienvenido ¿A dónde quieres viajar?', 'bot');
+      buttons(['Cancún', 'Mazatlán', 'Monterrey']);
+      step = 1;
+      break;
+
+    case 1:
+      data.destino = val;
+      addMsg('📅 Escribe la fecha de viaje', 'bot');
+      step = 2;
+      break;
+
+    case 2:
+      data.fecha = val;
+      addMsg('👤 Nombre completo', 'bot');
+      step = 3;
+      break;
+
+    case 3:
+      data.nombre = val;
+      addMsg('📞 Teléfono', 'bot');
+      step = 4;
+      break;
+
+    case 4:
+      data.telefono = val;
+      addMsg('⏳ Guardando reservación...', 'bot');
+      guardarReserva();
+      step = 0;
+      break;
+  }
+}
+
+// ✅ FUNCIÓN CORREGIDA Y LIMPIA
+function guardarReserva() {
+  // Validación básica de URL
+  if (!API_URL) {
+    addMsg('❌ URL de Apps Script no configurada', 'bot');
+    return;
+  }
+
+  const params = new URLSearchParams();
+  params.append('destino', data.destino || '');
+  params.append('fecha', data.fecha || '');
+  params.append('nombre', data.nombre || '');
+  params.append('telefono', data.telefono || '');
+
+  const url = API_URL + '?' + params.toString();
+
+  try {
+    // Método más estable para Google Apps Script
+    const img = new Image();
+    img.src = url;
+
+    addMsg(`✅ Reserva enviada:<br>Destino: ${data.destino}<br>Fecha: ${data.fecha}<br>Nombre: ${data.nombre}`, 'bot');
+
+    console.log('URL enviada:', url);
+
+  } catch (error) {
+    console.error('Error:', error);
+    addMsg('❌ Error al enviar datos', 'bot');
+  }
+}
+
+// 🧪 TEST SIMPLE
+function testEnvio() {
+  data = { destino: 'Test', fecha: 'Hoy', nombre: 'Prueba', telefono: '000' };
+  guardarReserva();
+}
+
+addMsg('💬 Hola, soy tu asistente de viajes', 'bot');
+</script>
 
 </body>
 </html>
+
