@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Explora el Mundo | PRO MAX</title>
+<style>
+body{margin:0;font-family:Arial;background:#f4f4f4}
+header{background:url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e') center/cover;color:#fff;padding:80px;text-align:center}
+.container{padding:20px;max-width:1000px;margin:auto}
+.card{background:#fff;border-radius:10px;padding:20px;box-shadow:0 4px 12px rgba(0,0,0,.2);margin-bottom:20px}
+.btn{background:#ff6600;color:#fff;padding:10px;border:none;border-radius:5px;cursor:pointer;margin-top:5px}
+input,select{width:100%;padding:12px;margin:8px 0;border-radius:5px;border:1px solid #ccc}
+.reserva{border-bottom:1px solid #ddd;padding:10px}
+.admin{display:none}
+.badge{padding:3px 8px;border-radius:5px;color:#fff}
+.pendiente{background:#999}
+.confirmado{background:#28a745}
+.topbar{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+</style>
+</head>
+<body>
+<header>
+<h1>🌍 NUEVA AVENTURA MONTERREY</h1>
+<p>Reservas</p>
+</header>
+<div class="container">
+  <div class="card">
+    <h2>✈️ Nueva Reserva</h2>
+    <form id="reservaForm">
+      <select id="destino">
+        <option value="BTS WORLD TOUR - 2950">BTS WORLD TOUR ($2950)</option>
+        <option value="MIRAMAR - 1200">MIRAMAR ($1200)</option>
+        <option value="SEMANA DE LA TROCA, MAZATLAN - 2500">SEMANA DE LA TROCA ($2500)</option>
+      </select>
+      <input type="text" id="nombre" placeholder="Nombre" required>
+      <input type="email" id="correo" placeholder="Correo" required>
+      <input type="tel" id="telefono" placeholder="Teléfono" required>
+      <input type="number" id="personas" placeholder="Personas" required>
+      <button class="btn" type="submit">Reservar</button>
+    </form>
+    <p id="status"></p>
+  </div>
+  <button class="btn" onclick="loginAdmin()">🔒 Panel Admin</button>
+  <div class="card admin" id="adminPanel">
+    <h2>📊 Panel Avanzado</h2>
+    <div class="topbar">
+      <button class="btn" onclick="exportarExcel()">📥 Exportar Excel</button>
+      <input type="text" id="buscador" placeholder="Buscar cliente...">
+      <select id="filtroEstado">
+        <option value="">Todos</option>
+        <option value="Pendiente">Pendiente</option>
+        <option value="Confirmado">Confirmado</option>
+      </select>
+      <select id="filtroDestino">
+        <option value="">Todos</option>
+        <option value="BTS WORLD TOUR">BTS WORLD TOUR</option>
+        <option value="MIRAMAR">MIRAMAR</option>
+        <option value="SEMANA DE LA TROCA">SEMANA DE LA TROCA</option>
+      </select>
+    </div>
+    <div id="listaReservas"></div>
+  </div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const firebaseConfig={apiKey:"AIzaSyC4FVokHFRbbTc4rBifNyt5bvOX2CuzkWw",authDomain:"calificaciones-9f753.firebaseapp.com",projectId:"calificaciones-9f753"};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.firestore();
+const form=document.getElementById('reservaForm');
+const lista=document.getElementById('listaReservas');
+const status=document.getElementById('status');
+let reservasData=[];
+form.addEventListener('submit',async(e)=>{
+ e.preventDefault();
+ const destino=document.getElementById('destino').value;
+ const nombre=document.getElementById('nombre').value;
+ const correo=document.getElementById('correo').value;
+ const telefono=document.getElementById('telefono').value;
+ const personas=parseInt(document.getElementById('personas').value);
+ const precio=parseInt(destino.split(' - ')[1]);
+ const total=precio*personas;
+ await db.collection("reservas").add({destino,nombre,correo,telefono,personas,total,estado:"Pendiente",fecha:new Date()});
+ status.innerText="✅ Reserva guardada";
+ form.reset();
+});
+db.collection("reservas").onSnapshot(snapshot=>{
+ reservasData=[];
+ snapshot.forEach(doc=>reservasData.push({id:doc.id,...doc.data()}));
+ renderReservas();
+});
+function renderReservas(){
+ const buscador=document.getElementById('buscador').value.toLowerCase();
+ const filtro=document.getElementById('filtroEstado').value;
+ const filtroDestino=document.getElementById('filtroDestino').value;
+ lista.innerHTML="";
+ reservasData.filter(r=>r.nombre.toLowerCase().includes(buscador))
+ .filter(r=>!filtro||r.estado===filtro)
+ .filter(r=>!filtroDestino||r.destino.includes(filtroDestino))
+ .forEach(data=>{
+ const estadoClass=data.estado==="Confirmado"?"confirmado":"pendiente";
+ const div=document.createElement('div');
+ div.classList.add('reserva');
+ div.innerHTML=`<strong>${data.nombre}</strong><br>${data.destino}<br>📞 ${data.telefono}<br>👥 ${data.personas}<br>💰 $${data.total}<br><span class="badge ${estadoClass}">${data.estado}</span><br><button class="btn" onclick="confirmar('${data.id}')">Confirmar</button><button class="btn" onclick="eliminar('${data.id}')">Eliminar</button>`;
+ lista.appendChild(div);
+ });
+}
+document.getElementById('buscador').addEventListener('input',renderReservas);
+document.getElementById('filtroEstado').addEventListener('change',renderReservas);
+document.getElementById('filtroDestino').addEventListener('change',renderReservas);
+function eliminar(id){db.collection("reservas").doc(id).delete();}
+function confirmar(id){db.collection("reservas").doc(id).update({estado:"Confirmado"});}
+function exportarExcel(){
+ if(reservasData.length===0){alert("No hay datos");return;}
+ const wb=XLSX.utils.book_new();
+ const porDestino={};
+ reservasData.forEach(r=>{const destinoNombre=r.destino.split(' - ')[0];if(!porDestino[destinoNombre]) porDestino[destinoNombre]=[];porDestino[destinoNombre].push(r);});
+ Object.keys(porDestino).forEach(dest=>{
+ const registros=porDestino[dest];
+ let confirmados=0,pendientes=0;
+ registros.forEach(r=>r.estado==="Confirmado"?confirmados++:pendientes++);
+ const data=registros.map(r=>({Nombre:r.nombre,Telefono:r.telefono,Personas:r.personas,Total:r.total,Estado:r.estado}));
+ const ws=XLSX.utils.json_to_sheet(data);
+ XLSX.utils.sheet_add_aoa(ws,[[],["RESUMEN"],["Confirmados",confirmados],["Pendientes",pendientes]],{origin:-1});
+ XLSX.utils.book_append_sheet(wb,ws,dest);
+ });
+ XLSX.writeFile(wb,"reservas.xlsx");
+}
+function loginAdmin(){const pass=prompt("Contraseña admin");if(pass==="1234")document.getElementById('adminPanel').style.display='block';else alert("Acceso denegado");}
+</script>
+</body>
+</html>
