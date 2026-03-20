@@ -1,7 +1,101 @@
 <script>
 
-  
-</script>
+  /* =========================
+   🔥 AQUI PEGAS EL CODIGO #2
+========================= */
+
+const listaDestinos = document.getElementById("listaDestinos");
+
+function guardarDestino(){
+  const nombre = document.getElementById("destinoNombre").value;
+  const precio = parseInt(document.getElementById("destinoPrecio").value);
+  const imagen = document.getElementById("destinoImagen").value;
+
+  if(!nombre || !precio || !imagen){
+    alert("Completa todos los campos");
+    return;
+  }
+
+  db.collection("destinos").doc(nombre).set({
+    nombre,
+    precio,
+    imagen
+  });
+
+  alert("✅ Destino guardado");
+}
+
+db.collection("destinos").onSnapshot(snapshot=>{
+  listaDestinos.innerHTML="";
+  snapshot.forEach(doc=>{
+    const d = doc.data();
+
+    const div = document.createElement("div");
+    div.classList.add("reserva");
+
+    div.innerHTML = `
+      <strong>${d.nombre}</strong><br>
+      💰 $${d.precio}<br>
+      <img src="${d.imagen}" width="100"><br>
+      <button class="btn" onclick="editarDestino('${d.nombre}','${d.precio}','${d.imagen}')">Editar</button>
+      <button class="btn" onclick="eliminarDestino('${d.nombre}')">Eliminar</button>
+    `;
+
+    listaDestinos.appendChild(div);
+  });
+});
+
+function editarDestino(nombre, precio, imagen){
+  document.getElementById("destinoNombre").value = nombre;
+  document.getElementById("destinoPrecio").value = precio;
+  document.getElementById("destinoImagen").value = imagen;
+}
+
+function eliminarDestino(nombre){
+  if(confirm("¿Eliminar destino?")){
+    db.collection("destinos").doc(nombre).delete();
+  }
+}
+
+const form=document.getElementById('reservaForm');
+const lista=document.getElementById('listaReservas');
+const status=document.getElementById('status');
+let reservasData=[];
+form.addEventListener('submit',async(e)=>{
+ e.preventDefault();
+ const destino=document.getElementById('destino').value;
+ const nombre=document.getElementById('nombre').value;
+ const correo=document.getElementById('correo').value;
+ const telefono=document.getElementById('telefono').value;
+ const personas=parseInt(document.getElementById('personas').value);
+ const precio=parseInt(destino.split(' - ')[1]);
+ const total=precio*personas;
+ await db.collection("reservas").add({destino,nombre,correo,telefono,personas,total,estado:"Pendiente",fecha:new Date()});
+ status.innerText="✅ Reserva guardada";
+ form.reset();
+});
+db.collection("reservas").onSnapshot(snapshot=>{
+ reservasData=[];
+ snapshot.forEach(doc=>reservasData.push({id:doc.id,...doc.data()}));
+ renderReservas();
+});
+function renderReservas(){
+ const buscador=document.getElementById('buscador').value.toLowerCase();
+ const filtro=document.getElementById('filtroEstado').value;
+ const filtroDestino=document.getElementById('filtroDestino').value;
+ lista.innerHTML="";
+ reservasData.filter(r=>r.nombre.toLowerCase().includes(buscador))
+ .filter(r=>!filtro||r.estado===filtro)
+ .filter(r=>!filtroDestino||r.destino.includes(filtroDestino))
+ .forEach(data=>{
+ const estadoClass=data.estado==="Confirmado"?"confirmado":"pendiente";
+ const div=document.createElement('div');
+ div.classList.add('reserva');
+ div.innerHTML=`<strong>${data.nombre}</strong><br>${data.destino}<br>📞 ${data.telefono}<br>👥 ${data.personas}<br>💰 $${data.total}<br><span class="badge ${estadoClass}">${data.estado}</span><br><button class="btn" onclick="confirmar('${data.id}')">Confirmar</button><button class="btn" onclick="eliminar('${data.id}')">Eliminar</button>`;
+ lista.appendChild(div);
+ });
+}
+
 <div class="card">
   <h2>⚙️ Administrar Destinos</h2>
 
@@ -16,3 +110,4 @@
   <h3>📍 Lista de destinos</h3>
   <div id="listaDestinos"></div>
 </div>
+  </script>
