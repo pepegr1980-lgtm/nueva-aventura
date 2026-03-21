@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Nueva Aventura Monterrey</title>
+
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js"></script>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background-color: #f5f5f5;
+  margin: 20px;
+}
+h1 {
+  text-align: center;
+}
+.card {
+  border: 1px solid #ccc;
+  padding: 15px;
+  margin: 10px auto;
+  width: 300px;
+  background-color: #fff;
+  border-radius: 10px;
+  box-shadow: 2px 2px 10px rgba(0,0,0,0.1);
+  text-align: center;
+}
+.card img {
+  max-width: 100%;
+  border-radius: 10px;
+  margin-bottom: 10px;
+}
+button {
+  margin-top: 10px;
+  padding: 8px 12px;
+  background-color: #007BFF;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+button:hover {
+  background-color: #0056b3;
+}
+
+/* Estilos modal */
+.modal {
+  display: none; 
+  position: fixed; 
+  z-index: 10; 
+  left: 0;
+  top: 0;
+  width: 100%; 
+  height: 100%; 
+  overflow: auto; 
+  background-color: rgba(0,0,0,0.5);
+}
+.modal-content {
+  background-color: #fff;
+  margin: 10% auto; 
+  padding: 20px;
+  border-radius: 10px;
+  width: 300px;
+  text-align: left;
+  position: relative;
+}
+.modal-content h2 {
+  text-align: center;
+}
+.close {
+  color: #aaa;
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+}
+.close:hover {
+  color: black;
+}
+.modal-content input {
+  width: 100%;
+  padding: 8px;
+  margin: 6px 0;
+  box-sizing: border-box;
+}
+.modal-content button {
+  width: 100%;
+  margin-top: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Destinos Disponibles</h1>
+<div id="lista"></div>
+
+<!-- Modal -->
+<div id="modalReserva" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <h2>Reserva tu viaje</h2>
+    <form id="formReserva">
+      <input type="text" id="nombre" placeholder="Nombre completo" required>
+      <input type="email" id="correo" placeholder="Correo electrónico" required>
+      <input type="tel" id="telefono" placeholder="Teléfono" required>
+      <input type="hidden" id="destinoSeleccionado">
+      <button type="submit">Reservar</button>
+    </form>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, onSnapshot, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC4FVokHFRbbTc4rBifNyt5bvOX2CuzkWw",
+  authDomain: "calificaciones-9f753.firebaseapp.com",
+  projectId: "calificaciones-9f753"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const lista = document.getElementById("lista");
+
+// Modal
+const modal = document.getElementById("modalReserva");
+const spanClose = document.querySelector(".close");
+const formReserva = document.getElementById("formReserva");
+const inputDestino = document.getElementById("destinoSeleccionado");
+
+// Cierra modal al hacer clic en X
+spanClose.onclick = () => { modal.style.display = "none"; }
+
+// Cierra modal al hacer clic fuera del contenido
+window.onclick = (event) => {
+  if(event.target == modal) modal.style.display = "none";
+}
+
+// Función para obtener imagen automática de Unsplash
+function obtenerImagenDestino(destino) {
+  const query = encodeURIComponent(destino);
+  return `https://source.unsplash.com/400x300/?${query}`;
+}
+
+// Escucha destinos
+onSnapshot(collection(db, "destinos"), (snapshot) => {
+  lista.innerHTML = "";
+
+  snapshot.forEach((doc) => {
+    const d = doc.data();
+    const imgSrc = obtenerImagenDestino(d.destino);
+
+    lista.innerHTML += `
+      <div class="card">
+        <img src="${imgSrc}" alt="${d.destino}">
+        <h3>${d.destino}</h3>
+        <p><b>Fecha:</b> ${d.fecha}</p>
+        <p><b>Precio:</b> $${d.precio}</p>
+        <p><b>Días:</b> ${d.dias}</p>
+        <p><b>Salida:</b> ${d.salida}</p>
+        <p><b>Regreso:</b> ${d.regreso}</p>
+        <button onclick="abrirModal('${d.destino}')">Reservar</button>
+      </div>
+    `;
+  });
+});
+
+// Abre modal y asigna destino
+function abrirModal(destino) {
+  inputDestino.value = destino;
+  modal.style.display = "block";
+}
+window.abrirModal = abrirModal;
+
+// Maneja envío del formulario
+formReserva.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const nombre = document.getElementById("nombre").value;
+  const correo = document.getElementById("correo").value;
+  const telefono = document.getElementById("telefono").value;
+  const destino = inputDestino.value;
+
+  try {
+    await addDoc(collection(db, "reservas"), {
+      destino: destino,
+      nombre: nombre,
+      correo: correo,
+      telefono: telefono,
+      fechaReserva: serverTimestamp()
+    });
+    alert(`¡Reserva para ${destino} realizada con éxito!`);
+    formReserva.reset();
+    modal.style.display = "none";
+  } catch (error) {
+    console.error(error);
+    alert("Error al guardar la reserva, intenta de nuevo.");
+  }
+});
+</script>
+
+</body>
+</html>
