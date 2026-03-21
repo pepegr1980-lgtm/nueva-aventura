@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Admin PRO - Nueva Aventura</title>
+
+<script type="module">
+
+function calcularRegreso() {
+  const salida = document.getElementById("fecha").value;
+  const noches = parseInt(document.getElementById("dias").value);
+
+  if (!salida || !noches) return;
+
+  const fechaSalida = new Date(salida);
+  fechaSalida.setDate(fechaSalida.getDate() + noches);
+
+  const regreso = fechaSalida.toISOString().split("T")[0];
+  document.getElementById("regreso").value = regreso;
+}
+function generarPuntos() {
+  const cantidad = parseInt(document.getElementById("cantidadPuntos").value);
+  const contenedor = document.getElementById("contenedorPuntos");
+
+  contenedor.innerHTML = "";
+
+  for (let i = 1; i <= cantidad; i++) {
+    contenedor.innerHTML += `
+      <input id="punto${i}" placeholder="Punto ${i}">
+    `;
+  }
+}
+
+// EVENTO
+window.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("cantidadPuntos")
+    .addEventListener("input", generarPuntos);
+});
+
+// EVENTOS
+document.getElementById("fecha").addEventListener("change", calcularRegreso);
+document.getElementById("dias").addEventListener("input", calcularRegreso);
+  
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+const firebaseConfig={apiKey:"AIzaSyC4FVokHFRbbTc4rBifNyt5bvOX2CuzkWw",
+authDomain:"calificaciones-9f753.firebaseapp.com",
+projectId:"calificaciones-9f753"};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+// LOGIN
+window.login = async () => {
+  const email = document.getElementById("email").value;
+  const pass = document.getElementById("pass").value;
+
+  await signInWithEmailAndPassword(auth, email, pass);
+};
+
+// LOGOUT
+window.logout = () => signOut(auth);
+
+// DETECTAR SESIÓN
+onAuthStateChanged(auth, user => {
+  document.getElementById("loginBox").style.display = user ? "none" : "block";
+  document.getElementById("adminBox").style.display = user ? "block" : "none";
+});
+
+// GUARDAR
+window.guardarDestino = async () => {
+  const data = getForm();
+
+  await addDoc(collection(db, "destinos"), data);
+  limpiar();
+};
+
+// ELIMINAR
+window.eliminar = async (id) => {
+  await deleteDoc(doc(db, "destinos", id));
+};
+
+// EDITAR
+window.editar = (id, d) => {
+  document.getElementById("destino").value = d.destino;
+  document.getElementById("fecha").value = d.fecha;
+  document.getElementById("precio").value = d.precio;
+  document.getElementById("dias").value = d.dias;
+  document.getElementById("salida").value = d.salida;
+  document.getElementById("regreso").value = d.regreso;
+  
+
+  window.idEditar = id;
+};
+
+// ACTUALIZAR
+window.actualizar = async () => {
+  const data = getForm();
+  await updateDoc(doc(db, "destinos", window.idEditar), data);
+  limpiar();
+};
+
+// FORM
+function getForm(){
+  return {
+    destino: destino.value,
+    fecha: fecha.value,
+    precio: precio.value,
+    dias: dias.value,
+    salida: salida.value,
+    regreso: regreso.value
+  }
+}
+
+function limpiar(){
+  document.querySelectorAll("input").forEach(i=>i.value="");
+}
+
+// LISTA EN TIEMPO REAL
+onSnapshot(collection(db,"destinos"), snap=>{
+  lista.innerHTML="";
+  snap.forEach(docu=>{
+    const d=docu.data();
+
+    lista.innerHTML+=`
+    <div class="card">
+      <b>${d.destino}</b>
+      <p>$${d.precio}</p>
+      <button onclick='editar("${docu.id}", ${JSON.stringify(d)})'>Editar</button>
+      <button onclick='eliminar("${docu.id}")'>Eliminar</button>
+    </div>`;
+  });
+});
+</script>
+
+<style>
+body{font-family:Arial;background:#f5f5f5;padding:20px}
+.card{background:#fff;padding:10px;margin:10px;border-radius:10px}
+input,button{padding:10px;margin:5px;width:100%}
+</style>
+</head>
+
+<body>
+
+<div id="loginBox">
+<h2>Login Admin</h2>
+<input id="email" placeholder="Correo">
+<input id="pass" type="password" placeholder="Contraseña">
+<button onclick="login()">Entrar</button>
+</div>
+
+<div id="adminBox" style="display:none">
+<h2>Panel Admin</h2>
+
+<input id="destino" placeholder="Destino">
+
+<input id="precio" placeholder="Precio">
+
+<input id="salida" placeholder="Salida">
+
+
+<label>Fecha de salida</label>
+<input type="date" id="fecha">
+
+<label>Noches</label>
+<input type="number" id="dias">
+
+<label>Fecha de regreso</label>
+<input type="date" id="regreso" readonly>
+
+<h3>📍 Puntos de reunión</h3>
+
+<input type="number" id="cantidadPuntos" placeholder="Cantidad de puntos">
+
+<div id="contenedorPuntos"></div>
+
+
+
+
+
+<button onclick="guardarDestino()">Guardar</button>
+<button onclick="actualizar()">Actualizar</button>
+<button onclick="logout()">Cerrar sesión</button>
+
+<h3>Destinos</h3>
+<div id="lista"></div>
+</div>
+
+</body>
+</html>
