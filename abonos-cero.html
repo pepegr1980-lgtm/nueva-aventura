@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Abonos Nueva Aventura Monterrey  Pro</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.1.1/dist/tesseract.min.js"></script>
+
+<style>
+body{font-family:Arial;background:#f4f4f4;display:flex;justify-content:center;padding-top:30px}
+.container{background:#fff;padding:20px;border-radius:10px;width:600px}
+input,select,button{width:100%;padding:10px;margin:8px 0}
+button{background:#28a745;color:#fff;border:none;cursor:pointer}
+img{width:250px;display:none;margin-top:10px;border-radius:8px}
+#importeDetectadoBox{background:#e9f7ef;padding:10px;border-radius:5px;display:none;font-weight:bold}
+.mensaje-ok{background:#d4edda;color:#155724}
+.mensaje-error{background:#f8d7da;color:#721c24}
+</style>
+</head>
+<body>
+<div class="container">
+<h2> Nueva Aventura Monterrey - Abonos</h2>
+
+<input type="tel" id="telefono" placeholder="Teléfono">
+<button id="buscarBtn">Buscar</button>
+
+<select id="destino">
+<option value="">Selecciona destino</option>
+</select>
+
+<input type="number" id="monto" placeholder="Monto">
+<input type="file" id="comprobante" accept="image/*">
+<img id="preview">
+<div id="importeDetectadoBox"></div>
+
+<button id="submitBtn">Enviar</button>
+<div id="mensajeBox" style="display:none;padding:10px;border-radius:6px;margin-top:10px;font-weight:bold;"></div>
+</div>
+
+<script>
+// 🔹 Firebase
+const firebaseConfig = {
+  apiKey: "AIzaSyC4FVokHFRbbTc4rBifNyt5bvOX2CuzkWw",
+  authDomain: "calificaciones-9f753.firebaseapp.com",
+  databaseURL: "https://calificaciones-9f753-default-rtdb.firebaseio.com",
+  projectId: "calificaciones-9f753",
+  storageBucket: "calificaciones-9f753.firebasestorage.app",
+  messagingSenderId: "907008005737",
+  appId: "1:907008005737:web:3069998b0bad883cc574f8"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+let importeTotalDetectado = 0;
+let comprobanteBase64 = "";
+let miniaturaBase64 = "";
+let reservaActual = null;
+
+// 🔹 OCR y generar miniatura
+document.getElementById('comprobante').addEventListener('change', async function(){
+  const file = this.files[0];
+  if(!file) return;
+
+  const preview = document.getElementById('preview');
+  const box = document.getElementById('importeDetectadoBox');
+  const montoInput = document.getElementById('monto');
+
+  // Vista previa
+  const reader = new FileReader();
+  reader.onload = e => {
+    preview.src = e.target.result;
+    preview.style.display = 'block';
+    comprobanteBase64 = e.target.result;
+  }
+  reader.readAsDataURL(file);
+
+  // Crear miniatura
+  const img = new Image();
+  img.src = URL.createObjectURL(file);
+  await new Promise(r=>img.onload=r);
+
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const maxWidth = 150;
+  const scale = maxWidth / img.width;
+  canvas.width = maxWidth;
+  canvas.height = img.height * scale;
+  ctx.drawImage(img,0,0,canvas.width,canvas.height);
+  miniaturaBase64 = canvas.toDataURL('image/jpeg',0.7);
+
+  box.style.display = 'block';
+  box.innerText = 'Procesando ticket...';
+
+  // OCR
+  try{
+    const cropY = img.height * 0.35;
+    const cropHeight = img.height * 0.4;
+    const ocrCanvas = document.createElement('canvas');
+    const octx = ocrCanvas.getContext('2d');
+    ocrCanvas.width = img.width;
+    ocrCanvas.height = cropHeight;
+    octx.drawImage(img,0,cropY,img.width,cropHeight,0,0,img.width,cropHeight);
+
+    let data = octx.getImageData(0,0,ocrCanvas.width,ocrCanvas.height);
+    for(let i=0;i<data.data.length;i+=4){
+      let gray = 0.299*data.data[i]+0.587*data.data[i+1]+0.114*data.data[i+2];
+      let bw = gray>140?255:0;
+      data.data[i]=data.data[i+1]=data.data[i+2]=bw;
+    }
+    octx.putImageData(data,0,0);
+
+    const { data:{ text } } = await Tesseract.recognize(ocrCanvas,'spa');
+    let cleanText = text.replace(/S(?=\d)/g,'$').replace(/O/g,'0').replace(/\s+/g,' ');
+
+    const regexDinero = /\$\s*\d{1,3}(?:,\d{3})*(?:\.\d{2})?/g;
+    let matches = [], match;
+    while((match=regexDinero.exec(cleanText))!==null){
+      matches.push({valor:parseFloat(match[0].replace('$','').replace(/\s/g,'').replace(/,/g,'')),index:match.index});
+    }
+
+    const keywords=["TRANSFERIDO","TRANSFERENCIA","IMPORTE","PAGO"];
+    let keyPositions=[];
+    keywords.forEach(k=>{
+      let r=new RegExp(k,"gi"), m;
+      while((m=r.exec(cleanText))!==null) keyPositions.push(m.index);
+    });
+
+    let mejor=null, menorDistancia=Infinity;
+    matches.forEach(m=>{
+      keyPositions.forEach(pos=>{
+        let dist=Math.abs(m.index-pos);
+        if(dist<menorDistancia){
+          menorDistancia=dist;
+          mejor=m.valor;
+        }
+      });
+    });
+
+    if(!mejor && matches.length) mejor = Math.max(...matches.map(m=>m.valor));
+    importeTotalDetectado = (mejor&&mejor>50)?mejor:0;
+
+    if(importeTotalDetectado){
+      montoInput.value = importeTotalDetectado;
+      box.innerText = "💰 Detectado: $" + importeTotalDetectado;
+    }else{
+      box.innerText = "❌ No se detectó monto";
+    }
+
+  }catch(e){
+    console.error(e);
+    box.innerText = "❌ Error OCR";
+  }
+});
+
+// 🔹 Buscar reservas
+document.getElementById('buscarBtn').onclick = async ()=>{
+  const tel = document.getElementById('telefono').value.replace(/\D/g,'');
+  const select = document.getElementById('destino');
+  select.innerHTML='<option>Selecciona</option>';
+
+  const snap = await db.collection('reservas').where('telefono','==',tel).get();
+  snap.forEach(doc=>{
+    const d=doc.data();
+    const opt=document.createElement('option');
+    opt.value=doc.id;
+    opt.textContent=`${d.destino||'Sin destino'} - Total: $${d.total||0} - Restante: $${d.restante||d.total||0}`;
+    select.appendChild(opt);
+  });
+
+  document.getElementById('submitBtn').disabled = false;
+  reservaActual = null;
+};
+
+// 🔹 Seleccionar reserva y verificar restante
+document.getElementById('destino').addEventListener('change', async ()=>{
+  const id = document.getElementById('destino').value;
+  if(!id) return;
+  const snap = await db.collection('reservas').doc(id).get();
+  if(!snap.exists) return;
+  reservaActual = snap.data();
+  if(reservaActual.restante === 0){
+    document.getElementById('submitBtn').disabled = true;
+    document.getElementById('mensajeBox').style.display='block';
+    document.getElementById('mensajeBox').className='mensaje-ok';
+    document.getElementById('mensajeBox').innerText='✅ Esta reserva ya está completamente pagada';
+  }else{
+    document.getElementById('submitBtn').disabled = false;
+    document.getElementById('mensajeBox').style.display='none';
+  }
+});
+
+// 🔹 Guardar abono + imagen + miniatura + actualizar restante
+document.getElementById('submitBtn').onclick = async ()=>{
+  const btn = document.getElementById('submitBtn');
+  const box = document.getElementById('mensajeBox');
+
+  const tel = document.getElementById('telefono').value.replace(/\D/g,'');
+  const id = document.getElementById('destino').value;
+  const monto = parseFloat(document.getElementById('monto').value);
+
+  box.style.display = 'none';
+  box.className = '';
+  btn.disabled = true;
+  btn.innerText = "Guardando...";
+
+  try{
+    if(!tel||!id||!monto||!comprobanteBase64) throw new Error("Completa todos los campos");
+    if(!importeTotalDetectado) throw new Error("No se detectó monto en el ticket");
+
+    const diferencia = Math.abs(monto - importeTotalDetectado);
+    if(diferencia > 1) throw new Error(`Monto incorrecto. Ticket: $${importeTotalDetectado} / Formulario: $${monto}`);
+
+    // 🔹 Obtener reserva actual
+    const reservaRef = db.collection('reservas').doc(id);
+    const reservaSnap = await reservaRef.get();
+    if(!reservaSnap.exists) throw new Error("Reserva no encontrada");
+    const reserva = reservaSnap.data();
+    let restante = (reserva.restante!==undefined)?reserva.restante:reserva.total;
+
+    if(restante === 0){
+      throw new Error("Esta reserva ya está completamente pagada");
+    }
+
+    // 🔹 Guardar abono
+    await db.collection('abonos').add({
+      telefono: tel,
+      reservaId: id,
+      monto: monto,
+      comprobanteBase64: comprobanteBase64,
+      miniaturaBase64: miniaturaBase64,
+      fecha: firebase.firestore.FieldValue.serverTimestamp(),
+      estado: 'pendiente'
+    });
+
+    // 🔹 Actualizar restante
+    let nuevoRestante = restante - monto;
+    if(nuevoRestante < 0) nuevoRestante = 0;
+    await reservaRef.update({restante: nuevoRestante});
+
+    if(nuevoRestante === 0){
+      box.style.display='block';
+      box.className='mensaje-ok';
+      box.innerText=`✅ Abono guardado. La reserva ya está completamente pagada`;
+      btn.disabled = true;
+    }else{
+      box.style.display='block';
+      box.className='mensaje-ok';
+      box.innerText=`✅ Abono guardado. Restante: $${nuevoRestante}`;
+      btn.disabled = false;
+    }
+
+    document.getElementById('monto').value='';
+    document.getElementById('comprobante').value='';
+    document.getElementById('preview').style.display='none';
+    comprobanteBase64='';
+    miniaturaBase64='';
+
+  }catch(err){
+    console.error(err);
+    box.style.display='block';
+    box.className='mensaje-error';
+    box.innerText="❌ "+err.message;
+    btn.disabled=false;
+  }finally{
+    btn.innerText="Enviar";
+  }
+};
+</script>
+</body>
+</html>
