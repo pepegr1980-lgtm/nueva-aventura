@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Viajes - Nueva Aventura Monterrey</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{font-family:Arial;margin:0;background:#f0f2f5}
+header{background:#0d6efd;color:#fff;padding:15px;text-align:center}
+
+.grid{
+display:grid;
+grid-template-columns:repeat(auto-fit,minmax(250px,1fr));
+gap:15px;
+padding:15px;
+}
+
+.card{
+background:#fff;
+border-radius:15px;
+padding:15px;
+box-shadow:0 5px 10px rgba(0,0,0,0.1);
+}
+
+button{
+padding:10px;
+border:none;
+border-radius:10px;
+width:100%;
+cursor:pointer;
+margin-top:5px;
+}
+
+.btn{background:#0d6efd;color:white}
+
+#modal{
+display:none;
+position:fixed;
+top:0;left:0;
+width:100%;height:100%;
+background:rgba(0,0,0,0.5);
+justify-content:center;
+align-items:center;
+}
+
+#formReserva{
+background:white;
+padding:20px;
+border-radius:15px;
+width:90%;
+max-width:350px;
+}
+
+input{
+width:100%;
+padding:8px;
+margin:5px 0;
+border-radius:8px;
+border:1px solid #ccc;
+}
+</style>
+</head>
+
+<body>
+
+<header>🌎 Nueva Aventura Monterrey</header>
+
+<div id="grid" class="grid"></div>
+
+<!-- MODAL -->
+<div id="modal" onclick="cerrarSiFondo(event)">
+  <div id="formReserva">
+    <h3>Reservar</h3>
+
+    <input id="rDestino" disabled>
+    <input id="rPrecio" disabled>
+    <input id="rGrupo" disabled placeholder="Link del grupo (opcional)">
+
+    <input id="rNombre" placeholder="Nombre">
+    <input id="rTelefono" placeholder="Teléfono">
+    <input id="rCiudad" placeholder="Ciudad de origen">
+    <input id="rPersonas" type="number" value="1">
+    <input id="rAnticipo" type="number" placeholder="Anticipo (opcional)">
+
+    <h4>Total: $<span id="rTotal">0</span></h4>
+
+    <button class="btn" onclick="confirmarReserva()">Confirmar</button>
+    <button onclick="cerrarReserva()">Cancelar</button>
+  </div>
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import {
+getFirestore, collection, onSnapshot, addDoc, doc, getDoc, updateDoc
+} from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+const firebaseConfig={
+  apiKey:"AIzaSyC4FVokHFRbbTc4rBifNyt5bvOX2CuzkWw",
+  authDomain:"calificaciones-9f753.firebaseapp.com",
+  projectId:"calificaciones-9f753"
+};
+
+const app=initializeApp(firebaseConfig);
+const db=getFirestore(app);
+
+/* ABRIR MODAL */
+window.abrirReserva = (id, d) => {
+  window.id = id;
+  window.data = d;
+
+  modal.style.display = "flex";
+
+  rDestino.value = d.destino;
+  rPrecio.value = d.precio;
+  rPersonas.value = 1;
+  rGrupo.value = d.grupo || "";
+
+  calcular();
+};
+
+/* CALCULAR TOTAL */
+window.calcular = () => {
+  rTotal.innerText = rPersonas.value * rPrecio.value;
+};
+rPersonas.oninput = calcular;
+
+/* CONFIRMAR RESERVA */
+window.confirmarReserva = async () => {
+  const ref = doc(db, "destinos", window.id);
+  const snap = await getDoc(ref);
+  const disp = snap.data().disponibles;
+
+  if (disp < rPersonas.value) {
+    alert("Sin lugares");
+    return;
+  }
+
+  const anticipo = Number(rAnticipo.value) || 0;
+  const total = Number(rTotal.innerText);
+  const restante = total - anticipo;
+
+  const reserva = {
+    destino: data.destino,
+    cliente: rNombre.value,
+    telefono: rTelefono.value,
+    ciudad: rCiudad.value,
+    personas: Number(rPersonas.value),
+    total,
+    anticipo,
+    restante,
+    estado: anticipo > 0 ? "Apartado" : "Pendiente",
+    fecha: new Date().toLocaleString(),
+    grupo: data.grupo || ""
+  };
+
+  /* GUARDAR RESERVA */
+  await addDoc(collection(db, "reservas"), reserva);
+
+  /* ACTUALIZAR CUPOS */
+  await updateDoc(ref, {
+    disponibles: disp - Number(rPersonas.value)
+  });
+
+  /* GUARDAR/ACTUALIZAR CLIENTE */
+  const clientesRef = collection(db, "clientes");
+  const clienteDoc = doc(clientesRef, reserva.telefono);
+  const clienteSnap = await getDoc(clienteDoc);
+
+  if (clienteSnap.exists()) {
+    const data = clienteSnap.data();
+    await updateDoc(clienteDoc, {
+      nombre: reserva.cliente,
+      total_reservas: (data.total_reservas || 0) + reserva.personas
+    });
+  } else {
+    await addDoc(clientesRef, {
+      nombre: reserva.cliente,
+      telefono: reserva.telefono,
+      fecha_registro: new Date().toLocaleString(),
+      total_reservas: reserva.personas
+    });
+  }
+
+  /* MENSAJE A LA AGENCIA */
+  const mensaje = `🌎 NUEVA RESERVA
+
+Destino: ${reserva.destino}
+Cliente: ${reserva.cliente}
+Tel: ${reserva.telefono}
+Ciudad: ${reserva.ciudad}
+
+Personas: ${reserva.personas}
+
+Total: $${reserva.total}
+Anticipo: $${reserva.anticipo}
+Restante: $${reserva.restante}
+
+Grupo: ${reserva.grupo}
+
+Estado: ${reserva.estado}`;
+
+  const telAgencia = "528131408323";
+  const telCliente = reserva.telefono.replace(/\D/g, "");
+
+  window.open(`https://wa.me/${telAgencia}?text=${encodeURIComponent(mensaje)}`);
+
+  /* MENSAJE AL CLIENTE */
+  setTimeout(() => {
+    let msgCliente = `Hola ${reserva.cliente} 👋
+
+Tu reserva está confirmada:
+
+🌎 ${reserva.destino}
+👥 ${reserva.personas}
+📍 Ciudad: ${reserva.ciudad}
+💰 Total: $${reserva.total}
+💵 Anticipo: $${reserva.anticipo}
+📌 Restante: $${reserva.restante}`;
+
+    if (reserva.grupo) {
+      msgCliente += `
+
+Únete al grupo de WhatsApp de este destino: ${reserva.grupo}`;
+    }
+
+    msgCliente += `
+
+Gracias por viajar con nosotros ✈️`;
+
+    window.open(`https://wa.me/52${telCliente}?text=${encodeURIComponent(msgCliente)}`);
+  }, 1500);
+
+  alert("Reserva completa 🚀");
+  cerrarReserva();
+};
+
+/* CERRAR MODAL */
+window.cerrarReserva = () => modal.style.display = "none";
+window.cerrarSiFondo = e => {
+  if (e.target.id === "modal") cerrarReserva();
+};
+
+/* LISTAR DESTINOS */
+onSnapshot(collection(db, "destinos"), snap => {
+  grid.innerHTML = "";
+  snap.forEach(docu => {
+    const d = docu.data();
+    const disp = d.disponibles ?? d.cupos;
+
+    grid.innerHTML += `
+    <div class="card">
+      <h3>${d.destino}</h3>
+      <p>$${d.precio}</p>
+      <p>${disp} lugares</p>
+      <button class="btn"
+      onclick='abrirReserva("${docu.id}",${JSON.stringify(d)})'>
+      Reservar</button>
+    </div>`;
+  });
+});
+
+</script>
+</body>
+</html>

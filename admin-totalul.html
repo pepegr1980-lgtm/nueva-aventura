@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Nueva Aventura Monterrey</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body{font-family:Arial;margin:0;background:#f0f2f5}
+header{background:#0d6efd;color:#fff;padding:15px;text-align:center;font-size:22px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:15px;padding:15px}
+.card{background:#fff;border-radius:15px;padding:10px;box-shadow:0 5px 15px rgba(0,0,0,.1)}
+button{padding:10px;border:none;border-radius:10px;margin:3px;cursor:pointer}
+input{padding:10px;margin:5px;width:100%;border-radius:10px;border:1px solid #ccc}
+#adminBox{display:none;padding:15px}
+#loginBox{padding:15px;max-width:300px;margin:auto}
+.section{margin-top:20px}
+</style>
+</head>
+
+<body>
+
+<header>🌎 Nueva Aventura Monterrey</header>
+
+<div>
+<h2 style="padding:10px">Destinos</h2>
+<div id="grid" class="grid"></div>
+</div>
+
+<div id="loginBox">
+<h3>Admin</h3>
+<input id="email" placeholder="Correo">
+<input id="pass" type="password" placeholder="Contraseña">
+<button onclick="login()">Entrar</button>
+</div>
+
+<div id="adminBox">
+
+<h2>Panel - Nueva Aventura Monterrey</h2>
+
+<div class="section">
+<h3>Destinos</h3>
+
+<input id="destino" placeholder="Destino">
+<input id="precio" placeholder="Precio">
+<input id="imagen" placeholder="URL Imagen">
+<input id="cupos" placeholder="Cupos">
+<input id="grupo" placeholder="Link grupo WhatsApp">
+
+<button onclick="guardarDestino()" id="btnGuardar">Guardar Destino</button>
+
+<div id="listaDestinos"></div>
+</div>
+
+<div class="section">
+<h3>Clientes</h3>
+<input id="nombreCliente" placeholder="Nombre">
+<input id="telefonoCliente" placeholder="Teléfono">
+<button onclick="guardarCliente()">Guardar Cliente</button>
+<div id="listaClientes"></div>
+</div>
+
+<div class="section">
+<h3>Reservas</h3>
+<div id="listaReservas"></div>
+</div>
+
+<div class="section">
+<h3>Pagos</h3>
+<input id="reservaId" placeholder="ID Reserva">
+<input id="montoPago" placeholder="Monto">
+<button onclick="registrarPago()">Registrar Pago</button>
+</div>
+
+<h3>💰 Ventas Totales: $<span id="ventas">0</span></h3>
+<h3>📊 Total por Destino</h3>
+<div id="totalesDestino"></div>
+<h3>👥 Total de Clientes: <span id="totalClientes">0</span></h3>
+<button onclick="logout()">Cerrar sesión</button>
+
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+import { getFirestore, collection, addDoc, onSnapshot, doc, updateDoc, deleteDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+const firebaseConfig={
+ apiKey:"AIzaSyC4FVokHFRbbTc4rBifNyt5bvOX2CuzkWw",
+ authDomain:"calificaciones-9f753.firebaseapp.com",
+ projectId:"calificaciones-9f753"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+
+let editId=null;
+
+/* LOGIN */
+window.login = async ()=> await signInWithEmailAndPassword(auth,email.value,pass.value);
+window.logout = ()=> signOut(auth);
+
+onAuthStateChanged(auth,user=>{
+  loginBox.style.display = user?"none":"block";
+  adminBox.style.display = user?"block":"none";
+});
+
+/* DESTINOS */
+window.guardarDestino = async ()=>{
+
+  if(editId){
+    const ref = doc(db,"destinos",editId);
+    await updateDoc(ref,{
+      destino:destino.value,
+      precio:Number(precio.value),
+      imagen:imagen.value,
+      cupos:Number(cupos.value),
+      grupo:grupo.value
+    });
+    editId=null;
+    btnGuardar.innerText="Guardar Destino";
+    destino.value=""; precio.value=""; imagen.value=""; cupos.value=""; grupo.value="";
+    return;
+  }
+
+  await addDoc(collection(db,"destinos"),{
+    destino:destino.value,
+    precio:Number(precio.value),
+    imagen:imagen.value,
+    cupos:Number(cupos.value),
+    disponibles:Number(cupos.value),
+    grupo:grupo.value
+  });
+
+  destino.value=""; precio.value=""; imagen.value=""; cupos.value=""; grupo.value="";
+};
+
+window.editarDestino=(id,data)=>{
+  destino.value=data.destino;
+  precio.value=data.precio;
+  imagen.value=data.imagen;
+  cupos.value=data.cupos;
+  grupo.value=data.grupo || "";
+  editId=id;
+  btnGuardar.innerText="Actualizar Destino";
+};
+
+window.eliminarDestino=async(id)=>{
+  if(!confirm("¿Deseas eliminar este destino?")) return;
+  await deleteDoc(doc(db,"destinos",id));
+};
+
+/* CLIENTES */
+window.guardarCliente = async ()=>{
+  await addDoc(collection(db,"clientes"),{
+    nombre:nombreCliente.value,
+    telefono:telefonoCliente.value
+  });
+};
+
+/* RESERVA */
+window.reservar = async (id,d)=>{
+  const ref = doc(db,"destinos",id);
+  const snap = await getDoc(ref);
+
+  const disponibles = snap.data().disponibles;
+  if(disponibles<=0){ alert("Sin lugares"); return; }
+
+  const reserva = await addDoc(collection(db,"reservas"),{
+    destinoId:id,
+    destino:d.destino,
+    total:d.precio,
+    pagado:0
+  });
+
+  await updateDoc(ref,{ disponibles: disponibles-1 });
+
+  alert("Reserva creada ID: "+reserva.id);
+
+  let mensaje = `Hola quiero reservar *${d.destino}*`;
+  if(d.grupo){ mensaje += `\n\nAquí está el grupo del viaje:\n${d.grupo}`; }
+
+  window.open(`https://wa.me/528131408323?text=${encodeURIComponent(mensaje)}`);
+};
+
+/* PAGOS */
+window.registrarPago = async ()=>{
+  const id = reservaId.value;
+  const monto = Number(montoPago.value);
+  const ref = doc(db,"reservas",id);
+  const snap = await getDoc(ref);
+  const pagado = (snap.data().pagado || 0) + monto;
+  await updateDoc(ref,{ pagado: pagado });
+};
+
+/* UI DESTINOS */
+onSnapshot(collection(db,"destinos"),snap=>{
+  grid.innerHTML="";
+  listaDestinos.innerHTML="";
+
+  snap.forEach(docu=>{
+    const d = docu.data();
+    const disp = d.disponibles ?? d.cupos ?? 0;
+    const reservados = d.cupos - disp;
+    const porcentaje = d.cupos ? ((reservados/d.cupos)*100).toFixed(0) : 0;
+
+    grid.innerHTML+=`
+    <div class="card">
+      <h3>${d.destino}</h3>
+      <p>$${d.precio}</p>
+      <p>🎟 Total: ${d.cupos}</p>
+      <p>✅ Disponibles: ${disp}</p>
+      <p>❌ Reservados: ${reservados}</p>
+      <div style="background:#ddd;border-radius:10px;height:10px;overflow:hidden">
+        <div style="width:${porcentaje}%;background:#0d6efd;height:100%"></div>
+      </div>
+      <small>${porcentaje}% ocupado</small>
+      <br>
+      <button onclick='reservar("${docu.id}",${JSON.stringify(d)})'>Reservar</button>
+      ${d.grupo ? `
+      <br>
+      <a href="${d.grupo}" target="_blank">
+      <button style="background:#25D366;color:white">Grupo WhatsApp</button>
+      </a>` : ""}
+    </div>`;
+
+    listaDestinos.innerHTML+=`
+    <div class="card">
+      <b>${d.destino}</b><br>
+      Total: ${d.cupos} | Disponibles: ${disp} | Reservados: ${reservados}
+      <br>
+      ${d.grupo ? `<a href="${d.grupo}" target="_blank">Grupo WhatsApp</a><br>` : ""}
+      <button onclick='editarDestino("${docu.id}",${JSON.stringify(d)})'>Editar</button>
+      <button onclick='eliminarDestino("${docu.id}")'>Eliminar</button>
+    </div>`;
+  });
+});
+
+/* CLIENTES */
+onSnapshot(collection(db,"clientes"),snap=>{
+  listaClientes.innerHTML="";
+  totalClientes.innerText = snap.size;
+  snap.forEach(docu=>{
+    const d=docu.data();
+    listaClientes.innerHTML+=`<div class="card">${d.nombre} - ${d.telefono}</div>`;
+  });
+});
+
+/* RESERVAS */
+onSnapshot(collection(db,"reservas"),snap=>{
+  listaReservas.innerHTML="";
+  let total=0;
+  let totales={};
+  snap.forEach(docu=>{
+    const d=docu.data();
+    total+=d.total || 0;
+    if(!totales[d.destino]) totales[d.destino]=0;
+    totales[d.destino]+=d.total || 0;
+    listaReservas.innerHTML+=`
+    <div class="card">
+      ${d.destino} | Total: $${d.total} | Pagado: $${d.pagado || 0}<br>ID: ${docu.id}
+    </div>`;
+  });
+  ventas.innerText=total;
+  totalesDestino.innerHTML="";
+  for(const destino in totales){
+    totalesDestino.innerHTML+=`<div class="card">${destino} → 💰 $${totales[destino]}</div>`;
+  }
+});
+
+</script>
+
+</body>
+</html>
